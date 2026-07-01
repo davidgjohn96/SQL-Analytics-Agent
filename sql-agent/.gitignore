@@ -1,0 +1,17 @@
+# Environments & secrets
+.venv/
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Eval outputs
+evals/results_*.csv
+evals/runs_*.json
+evals/comparison.csv
+
+# OS
+.DS_Store

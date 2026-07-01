@@ -1,0 +1,227 @@
+# SQL Analytics Agent
+
+A small AI agent that turns natural-language business questions into SQL, runs
+the query against a sample retail database, and explains the results — built to
+demonstrate **agent development, observability, and evaluation with Arize**.
+
+This is a teaching/demo project, not a production analytics platform. It is
+intentionally small, clean, and easy to read.
+
+---
+
+## Setup
+
+> Requires Python 3.12+.
+
+```bash
+# 1. From the sql-agent/ directory, create a virtual environment
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Create your .env from the template and fill in keys
+cp .env.example .env
+#   - OPENAI_API_KEY   (required to run the agent / evals)
+#   - OPENAI_MODEL     (defaults to gpt-4o; set to your preferred model)
+#   - ARIZE_SPACE_ID + ARIZE_API_KEY  (optional; enables Arize AX tracing)
+
+# 4. Seed the database (creates database/retail.db, deterministic)
+python -m database.seed
+
+# 5. Launch the app
+streamlit run app.py
+```
+
+If `ARIZE_SPACE_ID` / `ARIZE_API_KEY` are not set (or
+`ARIZE_TRACING_ENABLED=false`), the app runs fine — it just skips tracing.
+
+---
+
+## Deploy (Streamlit Community Cloud)
+
+This is a Streamlit app, so it deploys directly to
+[Streamlit Community Cloud](https://share.streamlit.io) — no rewrite needed.
+(It does **not** run on Vercel/Netlify: those host static sites and short-lived
+serverless functions, whereas Streamlit needs a long-running server.)
+
+1. **Push to GitHub.** Commit the whole `sql-agent/` folder, including the
+   pre-seeded `database/retail.db` (so the cloud app has data without running
+   the seed step). Never commit `.env` or `.streamlit/secrets.toml` — both are
+   gitignored.
+2. **Create the app** at <https://share.streamlit.io> → *New app*:
+   - **Main file path:** `sql-agent/app.py` (or just `app.py` if the repo root
+     *is* `sql-agent/`).
+   - **Python version:** 3.12+.
+   - Dependencies install automatically from `requirements.txt`.
+3. **Add secrets** under *App → Settings → Secrets*. Paste the contents of
+   [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example) with real
+   values. Streamlit exposes secrets as environment variables, so the app's
+   `os.getenv(...)` calls pick them up unchanged.
+4. **Deploy.** The app builds and serves at a public `*.streamlit.app` URL.
+
+> ⚠️ **Rotate your keys first.** The committed `.env.example` currently contains
+> what look like real OpenAI/Arize keys. Rotate them and replace the values with
+> placeholders before pushing anything public — a deployed app URL is
+> world-reachable.
+
+---
+
+## Architecture
+
+```text
+                       User Question
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │ Retrieve Schema│   Node 1  (CHAIN span)
+                    └───────┬───────┘
+                            ▼
+                    ┌───────────────┐
+                    │  Generate SQL │   Node 2  (LLM span)
+                    └───────┬───────┘
+                            ▼
+                    ┌───────────────┐
+                    │  Validate SQL │   Node 3  (TOOL span, sqlglot)
+                    └───────┬───────┘
+                  valid ─── │ ─── invalid ──┐
+                            ▼                │
+                    ┌───────────────┐        │
+                    │  Execute SQL  │ Node 4 │   (TOOL span, SQLAlchemy)
+                    └───────┬───────┘        │
+                    ok ─────│──── error ─────┤
+                            ▼                ▼
+                    ┌───────────────┐  ┌──────────────┐
+                    │Generate Summary│  │ Error Summary │
+                    └───────┬───────┘  └──────┬───────┘
+                            ▼                  ▼
+                          Response  ◀──────────┘
+```
+
+The graph is built in [agent/graph.py](agent/graph.py). Invalid SQL is never
+executed; validation and execution failures route to a graceful error summary.
+
+### Project layout
+
+```text
+sql-agent/
+├── app.py                     # Streamlit UI (schema browser + Q&A)
+├── requirements.txt
+├── .env.example
+├── .streamlit/
+│   ├── config.toml            # Theme + server config
+│   └── secrets.toml.example   # Template for Streamlit Cloud secrets
+├── agent/
+│   ├── graph.py               # LangGraph wiring + run_agent()
+│   ├── state.py               # Shared AgentState
+│   ├── prompts.py             # Prompt templates + variants A / B
+│   ├── nodes.py               # The 5 nodes, each an Arize span
+│   ├── tools.py               # Schema access, sqlglot validation, execution
+│   └── observability.py       # Arize AX tracer setup
+├── database/
+│   ├── retail.db              # Generated by seed.py
+│   ├── schema.py              # SQLAlchemy models
+│   ├── seed.py                # Deterministic fake-data generator
+│   └── schema_description.md  # Human-readable schema (used by Node 1)
+├── evals/
+│   ├── dataset.csv            # ~40 questions + expected tables/SQL
+│   └── experiments.py         # Prompt A vs B comparison harness
+├── traces/                    # Local trace artifacts (if any)
+└── README.md
+```
+
+---
+
+## Agent Design
+
+The agent is a [LangGraph](https://langchain-ai.github.io/langgraph/) state
+machine. State (`AgentState`) carries the question and each node's output.
+
+| # | Node | Kind | What it does |
+|---|------|------|--------------|
+| 1 | **Retrieve Schema** | LLM-assisted | Picks the minimal set of relevant tables for the question and builds a compact schema context from the **live** column lists. |
+| 2 | **Generate SQL** | LLM | Produces a single `SELECT` query from the schema + question. The system prompt is **read-only-only**: it must never emit `INSERT/UPDATE/DELETE/DDL`. |
+| 3 | **Validate SQL** | Tool (`sqlglot`) | Parses the SQL (SQLite dialect) and checks: valid syntax, single statement, SELECT-only, all referenced tables/columns (and CTE/alias names) exist. On failure, **execution is skipped**. |
+| 4 | **Execute SQL** | Tool (`SQLAlchemy`) | Runs the validated query, returns columns + rows (with a defensive row cap). DB errors are captured, not raised. |
+| 5 | **Generate Summary** | LLM | Explains the result set to a business user — concise, grounded only in the returned rows. |
+
+Two SQL-generation prompt variants live in
+[agent/prompts.py](agent/prompts.py):
+
+- **Variant A** — schema only.
+- **Variant B** — schema + business rules + two few-shot examples (the default).
+
+---
+
+## Arize
+
+### Tracing
+
+Tracing is set up once in [agent/observability.py](agent/observability.py) using
+`arize-otel`'s `register()` plus the OpenInference instrumentors:
+
+- **`LangChainInstrumentor`** — emits a span per LangGraph node.
+- **`OpenAIInstrumentor`** — emits an LLM span per model call (model, prompt,
+  tokens, latency).
+
+On top of auto-instrumentation, each node opens an explicit OpenInference span
+(`Schema Retrieval`, `SQL Generation`, `SQL Validation`, `SQL Execution`,
+`Summary Generation`) and records:
+
+- **input / output** (`input.value`, `output.value`),
+- **span kind** (`CHAIN` / `LLM` / `TOOL`),
+- **model & prompt** on the LLM nodes,
+- **errors** (validation/execution failures attach an `error` attribute and
+  record the exception),
+- **latency** (captured automatically by OpenTelemetry).
+
+Credentials are read from the environment (`ARIZE_SPACE_ID`, `ARIZE_API_KEY`) —
+never hard-coded. Set them in `.env`; get them from <https://app.arize.com>.
+
+### Evaluation dataset
+
+[evals/dataset.csv](evals/dataset.csv) contains ~40 business questions, each
+with `expected_tables` and a reference `expected_sql`. The reference queries all
+validate and execute against the seeded database, so they serve as a
+correctness oracle.
+
+### Prompt comparison experiment
+
+[evals/experiments.py](evals/experiments.py) runs the agent over the dataset
+with both prompt variants and compares:
+
+| Metric | How it's measured |
+|--------|-------------------|
+| **SQL validity** | Did the generated SQL pass `sqlglot` validation? |
+| **Execution success** | Did it run against the DB without error? |
+| **Answer quality** | Does the result set match the reference query's result set (order-insensitive)? |
+| **Latency** | Wall-clock seconds per question. |
+
+```bash
+python -m evals.experiments              # run variants A and B
+python -m evals.experiments --limit 5    # quick smoke run
+```
+
+Outputs: `results_<variant>.csv` (per-question), `comparison.csv` (aggregate),
+and `runs_<variant>.json` in the **Arize experiment run format**. Because every
+question runs through the instrumented agent, the experiment also populates
+traces in Arize. To register a run as a formal Arize experiment (via the `ax`
+CLI / `arize-experiment` skill):
+
+```bash
+ax experiments create --name "promptB" --dataset sql-agent-evals \
+    --space "$ARIZE_SPACE_ID" --file evals/runs_B.json
+```
+
+---
+
+## Future Improvements
+
+- **Automatic SQL repair** — on execution failure, feed the error back to the
+  LLM for one repair attempt before giving up.
+- **Clarification questions** — when a question is ambiguous, ask the user
+  instead of guessing.
+- **Chart generation** — render a bar/line chart for numeric result sets.
+- **Schema retrieval using embeddings** — for larger schemas, select relevant
+  tables via semantic search instead of feeding the whole table menu.

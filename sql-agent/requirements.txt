@@ -1,0 +1,27 @@
+# --- Core app ---
+streamlit>=1.40
+python-dotenv>=1.0
+
+# --- Agent framework ---
+langgraph>=0.2.50
+langchain-core>=0.3
+langchain-openai>=0.2
+
+# --- LLM ---
+openai>=1.50
+
+# --- Database / ORM ---
+SQLAlchemy>=2.0
+
+# --- SQL parsing & validation ---
+sqlglot>=25.0
+
+# --- Data (seed generation + evals) ---
+pandas>=2.0
+
+# --- Arize observability ---
+arize-otel>=0.7
+openinference-instrumentation-langchain>=0.1
+openinference-instrumentation-openai>=0.1
+opentelemetry-sdk>=1.27
+opentelemetry-exporter-otlp>=1.27

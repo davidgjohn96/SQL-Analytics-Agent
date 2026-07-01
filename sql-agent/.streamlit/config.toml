@@ -1,0 +1,11 @@
+[theme]
+base = "light"
+primaryColor = "#2E7D32"
+font = "sans serif"
+
+[server]
+# Streamlit Community Cloud sets the port; keep headless for server runs.
+headless = true
+
+[browser]
+gatherUsageStats = false
