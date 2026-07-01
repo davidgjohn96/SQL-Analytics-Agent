@@ -49,6 +49,16 @@ def setup_tracing():
         print(f"[observability] {_STATUS} — running without tracing.")
         return None
 
+    # ARIZE_DEBUG=true surfaces span/export activity in stdout (Cloud logs):
+    # every span is printed to the console, and OpenTelemetry's own export
+    # errors (e.g. rejected credentials) are logged at DEBUG.
+    debug = os.getenv("ARIZE_DEBUG", "false").lower() == "true"
+    if debug:
+        import logging
+
+        logging.basicConfig()
+        logging.getLogger("opentelemetry").setLevel(logging.DEBUG)
+
     try:
         from arize.otel import register
         from openinference.instrumentation.langchain import LangChainInstrumentor
@@ -58,6 +68,7 @@ def setup_tracing():
             space_id=space_id,
             api_key=api_key,
             project_name=project_name,
+            log_to_console=debug,
         )
 
         # LangChain instrumentor traces LangGraph node execution.
@@ -67,7 +78,8 @@ def setup_tracing():
 
         _TRACER = _TRACER_PROVIDER.get_tracer(__name__)
         _STATUS = f"enabled → project '{project_name}'"
-        print(f"[observability] Arize tracing {_STATUS}.")
+        print(f"[observability] Arize tracing {_STATUS}"
+              f"{' [DEBUG]' if debug else ''}.")
     except Exception as exc:  # noqa: BLE001 — never let tracing break the app
         _STATUS = f"error: {exc}"
         print(f"[observability] Failed to initialize tracing: {exc}")
