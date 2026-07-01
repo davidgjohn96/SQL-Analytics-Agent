@@ -1,0 +1,27 @@
+# Virtual environments (never commit these)
+.venv/
+**/.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Secrets & local env
+.env
+.env.bak
+**/.env
+**/.env.bak
+.streamlit/secrets.toml
+**/.streamlit/secrets.toml
+
+# Eval outputs
+sql-agent/evals/results_*.csv
+sql-agent/evals/runs_*.json
+sql-agent/evals/comparison.csv
+
+# OS
+.DS_Store
