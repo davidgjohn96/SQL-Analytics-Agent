@@ -3,8 +3,7 @@
 Registers an OpenTelemetry tracer that exports to Arize AX and attaches the
 OpenInference instrumentors for LangChain/LangGraph and OpenAI. Auto-
 instrumentation gives one span per LangGraph node plus the underlying LLM call
-spans; nodes additionally enrich their spans with explicit input/output/error
-attributes (see nodes.py).
+spans; nodes do not create any explicit spans of their own.
 
 Call `setup_tracing()` exactly once, before any LLM client is created.
 Credentials are read from the environment — never hard-coded.
@@ -62,7 +61,6 @@ def setup_tracing():
     try:
         from arize.otel import register
         from openinference.instrumentation.langchain import LangChainInstrumentor
-        from openinference.instrumentation.openai import OpenAIInstrumentor
 
         _TRACER_PROVIDER = register(
             space_id=space_id,
@@ -71,10 +69,11 @@ def setup_tracing():
             log_to_console=debug,
         )
 
-        # LangChain instrumentor traces LangGraph node execution.
+        # LangChain instrumentor traces LangGraph node execution and the
+        # underlying ChatOpenAI LLM calls (model, prompt, tokens, latency).
+        # It is the single source of spans — no manual spans, no OpenAI
+        # instrumentor, so each LLM call produces exactly one span.
         LangChainInstrumentor().instrument(tracer_provider=_TRACER_PROVIDER)
-        # OpenAI instrumentor captures model, prompt, tokens, latency.
-        OpenAIInstrumentor().instrument(tracer_provider=_TRACER_PROVIDER)
 
         _TRACER = _TRACER_PROVIDER.get_tracer(__name__)
         _STATUS = f"enabled → project '{project_name}'"

@@ -25,3 +25,4 @@ sql-agent/evals/comparison.csv
 
 # OS
 .DS_Store
+.arize-tmp-traces/

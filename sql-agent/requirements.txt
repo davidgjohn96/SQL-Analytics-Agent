@@ -22,6 +22,5 @@ pandas>=2.0
 # --- Arize observability ---
 arize-otel>=0.7
 openinference-instrumentation-langchain>=0.1
-openinference-instrumentation-openai>=0.1
 opentelemetry-sdk>=1.27
 opentelemetry-exporter-otlp>=1.27
