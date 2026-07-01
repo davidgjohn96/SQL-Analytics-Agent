@@ -23,8 +23,9 @@ pip install -r requirements.txt
 
 # 3. Create your .env from the template and fill in keys
 cp .env.example .env
-#   - OPENAI_API_KEY   (required to run the agent / evals)
-#   - OPENAI_MODEL     (defaults to gpt-4o; set to your preferred model)
+#   - OPENAI_API_KEY   (required — your provider key; a Groq key by default)
+#   - OPENAI_BASE_URL  (provider endpoint; defaults to Groq)
+#   - OPENAI_MODEL     (open-source model; defaults to openai/gpt-oss-120b)
 #   - ARIZE_SPACE_ID + ARIZE_API_KEY  (optional; enables Arize AX tracing)
 
 # 4. Seed the database (creates database/retail.db, deterministic)
@@ -61,10 +62,10 @@ serverless functions, whereas Streamlit needs a long-running server.)
    `os.getenv(...)` calls pick them up unchanged.
 4. **Deploy.** The app builds and serves at a public `*.streamlit.app` URL.
 
-> ⚠️ **Rotate your keys first.** The committed `.env.example` currently contains
-> what look like real OpenAI/Arize keys. Rotate them and replace the values with
-> placeholders before pushing anything public — a deployed app URL is
-> world-reachable.
+> ⚠️ **Shared key = shared bill.** The `OPENAI_API_KEY` you put in Streamlit
+> secrets is used by *every* visitor (they never see it, but they spend it).
+> Since the app URL is world-reachable, **set a spending limit** on the key at
+> your provider (e.g. Groq console) to cap abuse.
 
 ---
 

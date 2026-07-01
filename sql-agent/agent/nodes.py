@@ -27,7 +27,8 @@ ALL_TABLES = ["customers", "products", "orders", "order_items"]
 
 
 def _model_name() -> str:
-    return os.getenv("OPENAI_MODEL", "gpt-4o")
+    # Default: OpenAI's open-weight gpt-oss-120b, served by Groq.
+    return os.getenv("OPENAI_MODEL", "openai/gpt-oss-120b")
 
 
 def _temperature() -> float:
@@ -38,7 +39,17 @@ def _temperature() -> float:
 
 
 def _llm() -> ChatOpenAI:
-    return ChatOpenAI(model=_model_name(), temperature=_temperature())
+    """Build the chat model.
+
+    Uses an OpenAI-compatible endpoint. `OPENAI_BASE_URL` points at the provider
+    (default: Groq, which serves open-weight models); `OPENAI_API_KEY` holds that
+    provider's key. Leaving `OPENAI_BASE_URL` unset falls back to OpenAI itself.
+    """
+    kwargs: dict = {"model": _model_name(), "temperature": _temperature()}
+    base_url = os.getenv("OPENAI_BASE_URL")
+    if base_url:
+        kwargs["base_url"] = base_url
+    return ChatOpenAI(**kwargs)
 
 
 @contextmanager

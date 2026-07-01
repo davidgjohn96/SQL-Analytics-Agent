@@ -132,7 +132,7 @@ def to_arize_runs(detail: pd.DataFrame) -> list[dict]:
                     },
                 },
                 "metadata": {
-                    "model": os.getenv("OPENAI_MODEL", "gpt-4o"),
+                    "model": os.getenv("OPENAI_MODEL", "openai/gpt-oss-120b"),
                     "prompt_variant": r["variant"],
                     "latency_ms": int(r["latency_s"] * 1000),
                 },

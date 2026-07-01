@@ -102,7 +102,7 @@ def _render_schema_browser() -> None:
 # --------------------------------------------------------------------------- #
 with st.sidebar:
     st.header("⚙️ Settings")
-    st.write(f"**Model:** `{os.getenv('OPENAI_MODEL', 'gpt-4o')}`")
+    st.write(f"**Model:** `{os.getenv('OPENAI_MODEL', 'openai/gpt-oss-120b')}`")
     variant = st.radio(
         "Prompt variant",
         options=["B", "A"],
