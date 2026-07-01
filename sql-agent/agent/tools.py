@@ -4,7 +4,6 @@ and SQL execution. Kept free of LangGraph/LLM concerns so they're easy to test.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,9 +12,6 @@ from sqlglot import exp
 from sqlalchemy import inspect, text
 
 from database.schema import get_engine
-
-_DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "database")
-_SCHEMA_DESC_PATH = os.path.join(_DB_DIR, "schema_description.md")
 
 # Concise per-table summaries used during schema selection (Node 1).
 TABLE_SUMMARIES: dict[str, str] = {
@@ -30,12 +26,6 @@ def actual_schema() -> dict[str, list[str]]:
     """Return {table_name: [column, ...]} reflected live from retail.db."""
     insp = inspect(get_engine())
     return {t: [c["name"] for c in insp.get_columns(t)] for t in insp.get_table_names()}
-
-
-def load_schema_description() -> str:
-    """Full human-readable schema description (markdown)."""
-    with open(_SCHEMA_DESC_PATH, "r", encoding="utf-8") as fh:
-        return fh.read()
 
 
 def schema_overview() -> list[dict]:

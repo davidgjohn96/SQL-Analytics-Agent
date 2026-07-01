@@ -99,13 +99,6 @@ def is_tracing_active() -> bool:
     return _TRACER is not None
 
 
-def get_tracer():
-    """Return the active tracer, initializing if needed."""
-    if not _INITIALIZED:
-        return setup_tracing()
-    return _TRACER
-
-
 def flush() -> None:
     """Flush buffered spans. Call before a short-lived process exits."""
     if _TRACER_PROVIDER is not None:
