@@ -36,7 +36,7 @@ import time
 import pandas as pd
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from agent import tools  # noqa: E402
 from agent.graph import run_agent  # noqa: E402

@@ -12,7 +12,9 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True so edits to .env are picked up on rerun (not masked by a stale
+# value cached in the process env). No-op on Streamlit Cloud, which has no .env.
+load_dotenv(override=True)
 
 # Import after load_dotenv so tracing/LLM pick up env vars. Importing graph
 # also initializes Arize tracing exactly once.
