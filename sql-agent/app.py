@@ -7,6 +7,12 @@ Deployed on Streamlit Community Cloud (see README.md § Deploy).
 from __future__ import annotations
 
 import os
+import sys
+
+# Ensure this app's own directory (sql-agent/) is on the import path. On
+# Streamlit Community Cloud the app runs from the repo root, so without this the
+# sibling `agent` / `database` packages may not be importable.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pandas as pd
 import streamlit as st
