@@ -17,6 +17,7 @@ import os
 _TRACER = None
 _TRACER_PROVIDER = None
 _INITIALIZED = False
+_STATUS = "not initialized"
 
 
 def setup_tracing():
@@ -24,7 +25,7 @@ def setup_tracing():
 
     Returns the tracer (or None if tracing is disabled / not configured).
     """
-    global _TRACER, _TRACER_PROVIDER, _INITIALIZED
+    global _TRACER, _TRACER_PROVIDER, _INITIALIZED, _STATUS
 
     if _INITIALIZED:
         return _TRACER
@@ -32,7 +33,8 @@ def setup_tracing():
     _INITIALIZED = True
 
     if os.getenv("ARIZE_TRACING_ENABLED", "true").lower() == "false":
-        print("[observability] ARIZE_TRACING_ENABLED=false — tracing disabled.")
+        _STATUS = "disabled (ARIZE_TRACING_ENABLED=false)"
+        print(f"[observability] {_STATUS}.")
         return None
 
     space_id = os.getenv("ARIZE_SPACE_ID")
@@ -40,10 +42,11 @@ def setup_tracing():
     project_name = os.getenv("ARIZE_PROJECT_NAME", "sql-analytics-agent")
 
     if not space_id or not api_key:
-        print(
-            "[observability] ARIZE_SPACE_ID / ARIZE_API_KEY not set — "
-            "running without tracing."
+        missing = ", ".join(
+            n for n, v in (("ARIZE_SPACE_ID", space_id), ("ARIZE_API_KEY", api_key)) if not v
         )
+        _STATUS = f"off — missing secret(s): {missing}"
+        print(f"[observability] {_STATUS} — running without tracing.")
         return None
 
     try:
@@ -63,12 +66,26 @@ def setup_tracing():
         OpenAIInstrumentor().instrument(tracer_provider=_TRACER_PROVIDER)
 
         _TRACER = _TRACER_PROVIDER.get_tracer(__name__)
-        print(f"[observability] Arize tracing enabled (project='{project_name}').")
+        _STATUS = f"enabled → project '{project_name}'"
+        print(f"[observability] Arize tracing {_STATUS}.")
     except Exception as exc:  # noqa: BLE001 — never let tracing break the app
+        _STATUS = f"error: {exc}"
         print(f"[observability] Failed to initialize tracing: {exc}")
         _TRACER = None
 
     return _TRACER
+
+
+def tracing_status() -> str:
+    """Human-readable state of tracing (reflects the actual tracer, not just env)."""
+    if not _INITIALIZED:
+        setup_tracing()
+    return _STATUS
+
+
+def is_tracing_active() -> bool:
+    """True only if the tracer/provider actually initialized and will export."""
+    return _TRACER is not None
 
 
 def get_tracer():

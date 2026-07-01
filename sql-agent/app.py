@@ -27,7 +27,7 @@ load_dotenv(override=True)
 # project named by ARIZE_PROJECT_NAME).
 from agent import tools  # noqa: E402
 from agent.graph import run_agent  # noqa: E402
-from agent.observability import flush  # noqa: E402
+from agent.observability import flush, is_tracing_active, tracing_status  # noqa: E402
 
 st.set_page_config(page_title="SQL Analytics Agent", page_icon="📊", layout="wide")
 
@@ -49,11 +49,9 @@ EXAMPLE_QUESTIONS = [
 
 
 def _trace_status() -> str:
-    if os.getenv("ARIZE_TRACING_ENABLED", "true").lower() == "false":
-        return "Tracing disabled (ARIZE_TRACING_ENABLED=false)."
-    if os.getenv("ARIZE_SPACE_ID") and os.getenv("ARIZE_API_KEY"):
-        return "Tracing to Arize AX enabled."
-    return "Arize credentials not set — running without tracing."
+    # Reflects the real tracer state (whether register() actually succeeded),
+    # not just whether env vars are present.
+    return f"Tracing: {tracing_status()}"
 
 
 @st.cache_data(show_spinner=False)
@@ -121,7 +119,10 @@ with st.sidebar:
         ),
         help="Two prompt strategies compared in the evaluation suite. B is the default.",
     )
-    st.caption(_trace_status())
+    if is_tracing_active():
+        st.success(_trace_status(), icon="🔭")
+    else:
+        st.warning(_trace_status(), icon="⚠️")
 
     st.divider()
     st.markdown(
