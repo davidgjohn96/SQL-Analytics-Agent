@@ -111,14 +111,6 @@ def _render_schema_browser() -> None:
 with st.sidebar:
     st.header("⚙️ Settings")
     st.write(f"**Model:** `{os.getenv('OPENAI_MODEL', 'openai/gpt-oss-120b')}`")
-    variant = st.radio(
-        "Prompt variant",
-        options=["B", "A"],
-        format_func=lambda v: (
-            "B — schema + rules + few-shot" if v == "B" else "A — schema only"
-        ),
-        help="Two prompt strategies compared in the evaluation suite. B is the default.",
-    )
     if is_tracing_active():
         st.success(_trace_status(), icon="🔭")
     else:
@@ -173,7 +165,7 @@ run = st.button("Run", type="primary")
 if run and question.strip():
     with st.spinner("Thinking..."):
         try:
-            state = run_agent(question.strip(), prompt_variant=variant)
+            state = run_agent(question.strip())
         except Exception as exc:  # noqa: BLE001
             st.error(f"The agent failed: {exc}")
             st.stop()
@@ -217,8 +209,6 @@ if run and question.strip():
         st.write(state.get("relevant_tables", []))
         st.markdown("**Schema context**")
         st.code(state.get("schema_context", ""), language="text")
-        st.markdown("**Prompt variant**")
-        st.write(state.get("prompt_variant", ""))
         if os.getenv("ARIZE_SPACE_ID") and os.getenv("ARIZE_API_KEY"):
             st.caption(
                 "Full step-by-step spans (inputs, outputs, latency, model, "
