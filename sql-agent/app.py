@@ -23,9 +23,11 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # Import after load_dotenv so tracing/LLM pick up env vars. Importing graph
-# also initializes Arize tracing exactly once.
+# also initializes Arize tracing exactly once (all spans go to the single
+# project named by ARIZE_PROJECT_NAME).
 from agent import tools  # noqa: E402
 from agent.graph import run_agent  # noqa: E402
+from agent.observability import flush  # noqa: E402
 
 st.set_page_config(page_title="SQL Analytics Agent", page_icon="📊", layout="wide")
 
@@ -174,6 +176,11 @@ if run and question.strip():
         except Exception as exc:  # noqa: BLE001
             st.error(f"The agent failed: {exc}")
             st.stop()
+        finally:
+            # Long-running server: push this run's spans to Arize now instead of
+            # waiting on the batch timer (which can drop spans if the container
+            # idles). No-op when tracing is disabled.
+            flush()
 
     # --- Summary at the top ---
     st.subheader("Summary")
